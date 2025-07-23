@@ -37,7 +37,6 @@ jobs:
           BATCH_SIZE: 5
           BATCH_DELAY_MS: 1000
           MAX_RPC_RETRIES: 3
-          LOG_LEVEL: info
         run: npm run circ:once
 
       # Optional debug artifact: write JSON to run-output/ in runOnce if you want
