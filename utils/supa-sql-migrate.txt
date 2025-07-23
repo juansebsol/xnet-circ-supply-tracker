@@ -1,0 +1,33 @@
+create extension if not exists "uuid-ossp";
+create extension if not exists pgcrypto;
+
+create table if not exists public.circ_supply (
+  id uuid primary key default gen_random_uuid(),
+  ts timestamptz not null default now(),
+  total_supply numeric not null,
+  locked_balance numeric not null,
+  circulating_supply numeric not null,
+  pct_locked numeric generated always as (
+    case when total_supply > 0 then locked_balance / total_supply * 100 else null end
+  ) stored
+);
+create index if not exists circ_supply_ts_idx on public.circ_supply (ts desc);
+
+create table if not exists public.circ_wallet_balances (
+  wallet text primary key,
+  balance numeric not null,
+  last_updated timestamptz not null default now()
+);
+
+create table if not exists public.circ_log (
+  id uuid primary key default gen_random_uuid(),
+  ts timestamptz not null default now(),
+  status text,
+  total_supply numeric,
+  locked_balance numeric,
+  circulating_supply numeric,
+  wallets_checked int,
+  rpc_calls int,
+  error text
+);
+

@@ -1,0 +1,52 @@
+name: Circulating Supply Hourly
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # top of every hour UTC
+  workflow_dispatch:
+
+jobs:
+  circ-supply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    concurrency:
+      group: circ-supply
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Run circulating supply fetch
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RPC_URL: ${{ secrets.RPC_URL }}
+          TOKEN_MINT: ${{ secrets.TOKEN_MINT }}
+          LOCKED_WALLETS_JSON: ${{ secrets.LOCKED_WALLETS_JSON }} # optional URL override
+          BATCH_SIZE: 5
+          BATCH_DELAY_MS: 1000
+          MAX_RPC_RETRIES: 3
+          LOG_LEVEL: info
+        run: npm run circ:once
+
+      # Optional debug artifact: write JSON to run-output/ in runOnce if you want
+      - name: Upload run artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: circ-supply-run
+          path: run-output/**
+          if-no-files-found: ignore
+          retention-days: 7
+

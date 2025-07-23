@@ -1,0 +1,8 @@
+begin;
+  drop table if exists public.circ_log cascade;
+  drop table if exists public.circ_wallet_balances cascade;
+  drop table if exists public.circ_supply cascade;
+commit;
+
+-- Paste supa-sql-migrate.txt contents below if running in one batch
+
