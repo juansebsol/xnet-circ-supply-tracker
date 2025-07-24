@@ -298,60 +298,77 @@ Add Secrets: GitHub → Repo → Settings → Secrets & Variables → Actions. S
 
 ## 🌐 Public Read API (Optional / Vercel)
 
-Ship the repo to Vercel to expose a small JSON API (copy of the ergonomic pattern from the Offload project). Base URL will look like:
+This project includes an optional public JSON API, deployable via Vercel.
+
+---
+
+🔗 **Base URL**
+
+Once deployed, your API will be accessible at:
 
 ```
-https://YOUR-VERCEL-DEPLOYMENT.vercel.app/api
+https://your-vercel-deployment.vercel.app/api
 ```
 
-### API Source Layout
+> **Tip:** You can test locally by hitting `http://localhost:3000/api/*` if using `vercel dev`.
+
+---
+
+🗂️ **API Source Layout**
 
 ```
 api/
-├── _supabase.js   # Supabase admin client (server-only env vars)
-├── _util.js       # Unit + % helpers
-├── latest.js      # Most recent snapshot
-├── history.js     # Range or limit query
-├── summary.js     # Avg / min / max across N rows
-└── vercel.json    # Runtime config
+├── _supabase.js     # Shared Supabase admin client
+├── _util.js         # Format helpers (units, %)
+├── latest.js        # Latest supply snapshot
+├── history.js       # Supply snapshots by limit or range
+├── summary.js       # Summary (avg, min, max)
+└── vercel.json      # Runtime config
 ```
 
-The Offload README ships the same style of read‑only API folder mapping to /api/* endpoints.
+---
 
-#### Environment Variables (Vercel)
-Only Supabase vars are required for the read API — exactly like the Offload project (no Okta creds needed there; here we also don’t need chain creds for SELECTs if you’re just reading DB).
+🔐 **Required Environment Variables (Vercel)**
 
-| Name                      | Required | Description                |
-|---------------------------|----------|----------------------------|
-| SUPABASE_URL              | ✅       | Your Supabase URL.         |
-| SUPABASE_SERVICE_ROLE_KEY | ✅       | Service role (server only; never client‑side). |
+Only Supabase keys are needed for read access — no RPC or GitHub secrets.
 
-Optional: `TOKEN_DECIMALS` override if you want to force formatting.
+| Variable                   | Required | Description                        |
+|---------------------------|----------|------------------------------------|
+| SUPABASE_URL              | ✅       | Your Supabase project URL          |
+| SUPABASE_SERVICE_ROLE_KEY | ✅       | Service role key (read-only use)   |
+| TOKEN_DECIMALS            | ➖       | Optional override for formatting   |
 
-#### Deploy Steps (Vercel)
-- Commit `api/` files.
-- Add `vercel.json` at repo root.
-- Push repo to GitHub.
-- In Vercel: Add New Project → Import Git Repo.
-- Framework preset: Other (no build).
-- Add env vars (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`).
-- Deploy → get a URL like `https://xnet-circ-supply-scraper.vercel.app`.
+Add these in the Vercel dashboard: **Project → Settings → Environment Variables**
 
-#### Endpoints
+---
 
-| Endpoint                | Description                  | Example                                      |
-|-------------------------|------------------------------|----------------------------------------------|
-| /api/latest             | Most recent snapshot.        | /api/latest                                  |
-| /api/history?limit=N    | Last N rows (desc).          | /api/history?limit=30                        |
-| /api/history?start=YYYY-MM-DD&end=YYYY-MM-DD | Range filter (inclusive). | /api/history?start=2025-07-01&end=2025-07-22 |
-| /api/summary?limit=N    | Avg circ, % locked, min/max over N rows. | /api/summary?limit=30                        |
+🚀 **Deployment Steps (Vercel)**
 
-#### Response Shapes
+1. Commit the `api/` folder and `vercel.json` to your repo.
+2. Push to GitHub (or connect Git repo to Vercel).
+3. Import the project in Vercel.
+4. Set the required environment variables.
+5. Deploy.
+
+---
+
+📡 **Endpoints**
+
+| Endpoint                                    | Description                        | Example                                      |
+|---------------------------------------------|------------------------------------|----------------------------------------------|
+| `/api/latest`                               | Most recent supply snapshot        | `/api/latest`                                |
+| `/api/history?limit=10`                     | Last N rows (descending)           | `/api/history?limit=10`                      |
+| `/api/history?start=YYYY-MM-DD&end=YYYY-MM-DD` | Date range snapshot (inclusive) | `/api/history?start=2025-07-01&end=2025-07-22` |
+| `/api/summary?limit=30`                     | Summary stats over N rows (avg, min, max) | `/api/summary?limit=30`              |
+
+---
+
+📦 **Response Examples**
 
 **/api/latest**
 ```json
 {
-  "ts": "2025-07-22T06:00:00.000Z",
+  "ts": "2025-07-23T17:00:00.000Z",
   "total_supply": "250000000000000",
   "locked_balance": "120000000000000",
   "circulating_supply": "130000000000000",
@@ -368,22 +385,16 @@ Optional: `TOKEN_DECIMALS` override if you want to force formatting.
   "count": 3,
   "data": [
     {
-      "ts": "2025-07-22T06:00:00.000Z",
+      "ts": "2025-07-23T17:00:00.000Z",
       "circulating_supply": "130000000000000",
       "circFormatted": "130,000,000",
       "pctLocked": 48
     },
     {
-      "ts": "2025-07-21T06:00:00.000Z",
+      "ts": "2025-07-22T17:00:00.000Z",
       "circulating_supply": "129500000000000",
       "circFormatted": "129,500,000",
       "pctLocked": 48.2
-    },
-    {
-      "ts": "2025-07-20T06:00:00.000Z",
-      "circulating_supply": "129300000000000",
-      "circFormatted": "129,300,000",
-      "pctLocked": 48.3
     }
   ]
 }
@@ -409,50 +420,42 @@ Optional: `TOKEN_DECIMALS` override if you want to force formatting.
 }
 ```
 
-#### Parameter Rules
-- `limit`: integer > 0; fetch last N rows (desc).
-- `start` / `end`: ISO timestamps or dates (YYYY-MM-DD); both required when used.
-- No params → full history (desc).
-- Newest first by default.
+---
 
-#### Quick Test Commands
+⚠️ **Error Responses**
 
-All snapshots:
-```bash
-curl https://xnet-circ-supply-scraper.vercel.app/api/history
-```
-Last 7 entries:
-```bash
-curl "https://xnet-circ-supply-scraper.vercel.app/api/history?limit=7"
-```
-Custom range:
-```bash
-curl "https://xnet-circ-supply-scraper.vercel.app/api/history?start=2025-07-01&end=2025-07-22"
-```
-Latest:
-```bash
-curl https://xnet-circ-supply-scraper.vercel.app/api/latest
-```
-Summary (30):
-```bash
-curl "https://xnet-circ-supply-scraper.vercel.app/api/summary?limit=30"
-```
-
-#### Error Responses
-
-| Status | Cause                  | Example body                        |
-|--------|------------------------|-------------------------------------|
-| 400    | Bad params             | {"error":"Invalid limit param"}     |
-| 404    | No data (/latest empty)| {"error":"No data"}                 |
-| 405    | Wrong method           | {"error":"Method not allowed"}      |
-| 500    | Supabase error         | {"error":"Database error"}          |
+| Code | Message                   | Example Body                        |
+|------|---------------------------|-------------------------------------|
+| 400  | Bad or missing parameters | {"error":"Invalid limit param"}     |
+| 404  | No data (e.g. /latest)    | {"error":"No data"}                 |
+| 405  | Unsupported method        | {"error":"Method not allowed"}      |
+| 500  | Internal / Supabase error | {"error":"Database error"}          |
 
 ---
 
-## 🛡️ Security Notes
-- Service role key lives only in GitHub & Vercel server envs (never in client bundles) — same best practice called out in Offload README.
-- API is read‑only; no writes exposed publicly. Offload API followed this approach.
-- Consider enabling Row Level Security (RLS) in Supabase if exposing direct DB access elsewhere, as noted in Offload docs.
+🧪 **Quick Testing**
+
+```bash
+# All history
+curl https://your-vercel-url.vercel.app/api/history
+
+# Last 7 snapshots
+curl "https://your-vercel-url.vercel.app/api/history?limit=7"
+
+# Specific date range
+curl "https://your-vercel-url.vercel.app/api/history?start=2025-07-01&end=2025-07-22"
+
+# Most recent
+curl https://your-vercel-url.vercel.app/api/latest
+
+# Summary of 30 snapshots
+curl "https://your-vercel-url.vercel.app/api/summary?limit=30"
+```
+
+---
+
+- Service role key lives only in GitHub & Vercel server envs (never in client bundles).
+- API is read‑only; no writes exposed publicly.
 
 ---
 
@@ -475,15 +478,3 @@ Core:
 - [@solana/web3.js](https://www.npmjs.com/package/@solana/web3.js)
 - [@supabase/supabase-js](https://www.npmjs.com/package/@supabase/supabase-js)
 - [dotenv](https://www.npmjs.com/package/dotenv)
-
----
-
-## 📝 Credits & Inspiration
-
-This project’s structure, API, and operational patterns are inspired by the [xnet-offload-scraper](https://github.com/your-org/xnet-offload-scraper) project. For more details on best practices, see that repo’s README.
-
----
-
-## 📬 Questions / Feedback
-
-Open an issue or PR, or reach out to the maintainers for support or suggestions. 
