@@ -118,6 +118,25 @@ LOG_LEVEL=info
 
 Runs full process once locally `npm run circ:once`
 
+### Testing Balance Logic
+
+Test the new address handling logic with `npm run test:balance`:
+
+```bash
+npm run test:balance
+```
+
+This will test both token account and wallet address handling for addresses in your locked wallets list.
+
+### Address Type Handling
+
+The system now handles both types of addresses in your locked wallets list:
+
+- **Token Account Addresses**: Direct token account addresses that hold balances
+- **Wallet Addresses**: Owner addresses that may have multiple token accounts
+
+The logic automatically detects the address type and fetches the appropriate balance.
+
 ```bash
 npm install        # first time; or npm ci in CI
 cp .env.sample .env
@@ -208,11 +227,17 @@ commit;
 - Load env/config.
 - Fetch total token supply.
 - Load locked wallet list.
-- Batch fetch each wallet balance (parsed token accounts first; fallback path).
+- Batch fetch each address balance (token account first, then wallet owner fallback).
 - Sum locked; calc circ.
 - Insert snapshot row.
 - Upsert per‑wallet balances.
 - Log run metrics (`circ_log`).
+
+**getAddressTokenBalance()** (from `src/fetchSupply.js`)
+- First tries to treat address as a token account: checks account info and gets balance if valid.
+- If not a token account (or not for our mint), falls back to treating as wallet owner.
+- Uses parsed token accounts first, then raw enumeration as fallback.
+- Handles both token account addresses and wallet addresses in the locked list.
 
 **insertSupplySnapshot() / upsertWalletBalances() / logCircRun()** (from `src/upsert.js`)
 - Direct Supabase writes.
@@ -225,6 +250,7 @@ commit;
 | Action                | Command / Method         |
 |-----------------------|-------------------------|
 | Local one‑shot        | npm run circ:once       |
+| Test balance logic     | npm run test:balance    |
 | GitHub hourly cron    | Auto via Actions (circ-supply.yml) |
 | Setup Supabase schema | Paste migrate SQL into Supabase |
 | Update locked wallets | Edit /data/locked-wallets.json or provide URL in env |

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "circ:once": "node ./src/runOnce.js",
+    "test:balance": "node ./src/testBalanceLogic.js",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

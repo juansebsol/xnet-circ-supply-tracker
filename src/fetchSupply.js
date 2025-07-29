@@ -37,7 +37,7 @@ export async function runJob() {
 
     const balances = await Promise.all(
       batch.map((addr) =>
-        getOwnerTokenBalanceWithRetry(connection, mintPk, addr, MAX_RPC_RETRIES, () => (rpcCalls += 1))
+        getAddressTokenBalanceWithRetry(connection, mintPk, addr, MAX_RPC_RETRIES, () => (rpcCalls += 1))
       )
     );
 
@@ -102,12 +102,28 @@ export async function runJob() {
   };
 }
 
-async function getOwnerTokenBalance(connection, mintPk, ownerAddr) {
-  const ownerPk = new PublicKey(ownerAddr);
+export async function getAddressTokenBalance(connection, mintPk, addr) {
+  const addrPk = new PublicKey(addr);
 
-  // Try parsed (1 RPC)
+  // First, try to treat the address as a token account
   try {
-    const parsed = await connection.getParsedTokenAccountsByOwner(ownerPk, { mint: mintPk });
+    const accountInfo = await connection.getParsedAccountInfo(addrPk);
+    if (accountInfo?.value?.data?.program === 'spl-token' || accountInfo?.value?.data?.program === 'spl-token-2022') {
+      const parsedData = accountInfo.value.data.parsed;
+      if (parsedData && parsedData.info.mint === mintPk.toString()) {
+        // This is a token account for our mint
+        const amount = parsedData.info.tokenAmount.amount;
+        return BigInt(amount);
+      }
+    }
+  } catch {
+    // Not a valid token account or not for our mint, continue to owner logic
+  }
+
+  // Fallback: treat as wallet owner and get all token accounts
+  try {
+    // Try parsed (1 RPC)
+    const parsed = await connection.getParsedTokenAccountsByOwner(addrPk, { mint: mintPk });
     let amount = 0n;
     if (parsed?.value?.length) {
       for (const acc of parsed.value) {
@@ -122,7 +138,7 @@ async function getOwnerTokenBalance(connection, mintPk, ownerAddr) {
 
   // Fallback: enumerate + get balances
   try {
-    const tokenAccounts = await connection.getTokenAccountsByOwner(ownerPk, { mint: mintPk });
+    const tokenAccounts = await connection.getTokenAccountsByOwner(addrPk, { mint: mintPk });
     let amount = 0n;
     for (const t of tokenAccounts.value) {
       const bal = await connection.getTokenAccountBalance(t.pubkey);
@@ -130,18 +146,18 @@ async function getOwnerTokenBalance(connection, mintPk, ownerAddr) {
     }
     return amount;
   } catch (err) {
-    console.error(`Balance fetch failed for ${ownerAddr}:`, err);
+    console.error(`Balance fetch failed for ${addr}:`, err);
     return 0n;
   }
 }
 
-async function getOwnerTokenBalanceWithRetry(connection, mintPk, ownerAddr, maxRetries, bumpRpcCall) {
+async function getAddressTokenBalanceWithRetry(connection, mintPk, addr, maxRetries, bumpRpcCall) {
   let attempt = 0;
   let lastErr;
   while (attempt <= maxRetries) {
     try {
       bumpRpcCall();
-      const bal = await getOwnerTokenBalance(connection, mintPk, ownerAddr);
+      const bal = await getAddressTokenBalance(connection, mintPk, addr);
       return bal;
     } catch (err) {
       lastErr = err;
@@ -150,7 +166,7 @@ async function getOwnerTokenBalanceWithRetry(connection, mintPk, ownerAddr, maxR
       await new Promise((r) => setTimeout(r, backoff));
     }
   }
-  console.error(`Retries exhausted for ${ownerAddr}:`, lastErr);
+  console.error(`Retries exhausted for ${addr}:`, lastErr);
   return 0n;
 }
 
